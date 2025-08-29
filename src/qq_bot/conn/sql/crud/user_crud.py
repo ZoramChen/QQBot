@@ -9,9 +9,9 @@ _user_by_name_cache: LRUCache[str, str] = LRUCache(maxsize=1024 * 10)
 _user_by_id_cache: LRUCache[str, str] = LRUCache(maxsize=1024 * 10)
 
 
-@cached(_user_by_name_cache, key=lambda db, id: str(hashkey(id)))  # noqa
-def select_user_by_id(db: Session, id: int) -> UserV1 | None:
-    result = db.exec(select(UserV1).where(UserV1.id == str(id))).first()
+@cached(_user_by_name_cache, key=lambda db, user_id: str(hashkey(user_id)))  # noqa
+def select_user_by_id(db: Session, user_id: int) -> UserV1 | None:
+    result = db.exec(select(UserV1).where(UserV1.user_id == str(user_id))).first()
     return result
 
 
@@ -33,18 +33,51 @@ def insert_users(db: Session, users: list[QUser] | QUser) -> None:
     db.commit()
 
 
-def update_users(db: Session, users: list[UserV1], updated_users: list[QUser]) -> None:
-    id_users_mapping = {int(u.id): u for u in updated_users}
+def update_users(
+        db: Session,
+        updated_users: list[QUser]
+) -> None:
+    if not updated_users:
+        return
 
-    for user in users:
-        q_user = id_users_mapping[int(user.id)]
+    # 1. 把 QUser 转成 id -> QUser 映射
+    q_map = {int(q.user_id): q for q in updated_users}
+
+    # 2. 一次性查出已存在的 UserV1
+    existing = {
+        int(u.user_id): u
+        for u in db.exec(
+            select(UserV1).where(UserV1.user_id.in_(map(str, q_map.keys())))
+        ).all()
+    }
+
+    # 3. 更新或新增
+    to_flush = []
+    for uid, q_user in q_map.items():
+        user = existing.get(uid)
+        if user is None:
+            # 数据库里没有就新建
+            user = UserV1(user_id=str(uid))
+            db.add(user)
+        # 同步字段
         for field, value in q_user.to_dict().items():
             setattr(user, field, value)
+        to_flush.append(user)
 
-        # 清除缓存
+    # 4. 清缓存
+    for q_user in updated_users:
         _user_by_name_cache.pop(str(hashkey(q_user.nikename)), None)
-        _user_by_id_cache.pop(str(hashkey(q_user.id)), None)
+        _user_by_id_cache.pop(str(hashkey(q_user.user_id)), None)
 
-    # 批量提交更新的用户
-    db.add_all(users)
+    # 5. 一次性 flush + commit
+    db.add_all(to_flush)
     db.commit()
+
+def fetch_all_users_info(db: Session) -> list[UserV1]:
+    """
+    读取 private_message_v1 全表数据，按 id 升序排列，
+    返回 PrivateMessageRecord 列表。
+    """
+    stmt = select(UserV1)
+    rows = db.exec(stmt).all()
+    return list(rows)

@@ -8,11 +8,14 @@ import os
 import pkgutil
 import re
 from typing import Literal
-
+import requests
+import json
 import yaml
 from PIL import Image
 from ncatbot.core import GroupMessage
 from qq_bot.utils.logging import logger
+import requests
+import json
 
 
 def load_yaml(yaml_path: str) -> dict:
@@ -64,3 +67,28 @@ def blue_image(image: Image.Image) -> Image.Image:
     from PIL import ImageFilter
 
     return image.filter(ImageFilter.BLUR)
+
+
+def search_meme(keyword: str,
+                page: int = 1,
+                num: int = 10,
+                timeout: int = 5) -> list[str]:
+
+    url = "https://h5api.sginput.qq.com/wxbq/search"
+    params = {
+        "key": keyword,
+        "page": page,
+        "num": num
+    }
+    try:
+        resp = requests.post(url, params=params, timeout=timeout)
+        resp.raise_for_status()
+        result = resp.json()
+        meme_urls = [item['indexUrl'].strip() for item in result['data']]
+        return meme_urls
+    except requests.RequestException as e:
+        logger.error("网络或 HTTP 异常：", e)
+        return []
+    except json.JSONDecodeError as e:
+        logger.error("返回内容不是合法 JSON：", e)
+        return []

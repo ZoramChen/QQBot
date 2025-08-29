@@ -34,6 +34,8 @@ minio = "^7.2.15"
 pillow = "^11.1.0"
 ncatbot = "^3.5.11"
 mcstatus = "^11.1.1"
+cryptography = "^45.0.6"
+asyncmy = "^0.2.10"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2"
@@ -73,7 +75,24 @@ run = { shell = "poetry run python -m qq_bot.main" }
 check = { sequence = ["_install", "_fix", "_lint", "_format"], ignore_fail = false, help = "Auto-fix and format the code using ruff." }
 test = { sequence = ["_test"]}
 check-test = { sequence = ["check", "_test"]}
-update-db = {shell = "make update-db", help="Auto update local code base on the database."}
+update-db = { help = "Update database", sequence = [
+    "_update-db",
+] }
+
+[tool.poe.tasks._update-db]
+shell = """
+ sqlacodegen --generator sqlmodels \
+ --options legacy \
+     --tables \
+         group_message_v1,\
+         private_message_v1,\
+         user_group_v1,\
+         user_v1 \
+     --outfile ./src/qq_bot/conn/sql/models.py \
+     ${SQL_DATABASE_URI}
+ """
+
+
 
 [tool.pytest.ini_options]
 testpaths = "tests"

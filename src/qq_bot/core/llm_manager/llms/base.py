@@ -62,9 +62,10 @@ class OpenAIBase:
         self.is_activate: bool = self.configs.get("activate", False)
         self.default_reply: str = self.configs.get("default_reply", "None")
         self.prompt: str = self.configs.get("prompts", {}).get(prompt_version, "")
-        self.system_prompt = ChatCompletionSystemMessageParam(
+        self.custom_system_prompt: str = self.configs.get("custom_system_prompt", {}).get(prompt_version, "")
+        self.base_system_prompt = ChatCompletionSystemMessageParam(
             content=(
-                self.configs.get("system_prompt", {}).get(
+                self.configs.get("base_system_prompt", {}).get(
                     prompt_version, "You are a helpful assistant."
                 )
             ),
@@ -99,11 +100,11 @@ class OpenAIBase:
 
             if isinstance(content, str):
                 messages = [
-                    self.system_prompt,
+                    self.base_system_prompt,
                     self.format_user_message(content=content),
                 ]
             if isinstance(content, list):
-                content.insert(0, self.system_prompt)
+                content.insert(0, self.base_system_prompt)
                 messages = content
             completion = self.client.chat.completions.create(
                 messages=messages,
@@ -131,22 +132,25 @@ class OpenAIBase:
             model = model or self.default_model
             if isinstance(content, str):
                 messages = [
-                    self.system_prompt,
+                    self.base_system_prompt,
                     self.format_user_message(content=content),
                 ]
             if isinstance(content, list):
-                content.insert(0, self.system_prompt)
+                content.insert(0, self.base_system_prompt)
                 messages = content
-
+            if "custom_system_prompt" in kwargs:
+                if kwargs["custom_system_prompt"]:
+                    messages.insert(1, kwargs["custom_system_prompt"])
+                kwargs.pop("custom_system_prompt")
             completion = await self.async_client.chat.completions.create(
                 messages=messages, model=model, **kwargs
             )
             if completion.choices and completion.choices[-1].message:
+                raw = completion.choices[-1].message.content or ""
+                cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+                completion.choices[-1].message.content = cleaned
                 return completion.choices[-1].message
-                # response = completion.choices[-1].message.content
-                # if response:
-                #     return response
-                # return None
+
             return None
         else:
             return self.default_reply

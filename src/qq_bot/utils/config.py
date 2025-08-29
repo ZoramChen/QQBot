@@ -2,17 +2,18 @@ from pydantic_settings import BaseSettings
 
 
 class SysSetting(BaseSettings):
-    PROJECT_NAME: str = "LQBot"
+    PROJECT_NAME: str = "QQBot"
     DEBUG: bool = True
 
     # Bot基本设置
     BOT_UID: str = ""
+    ROOT: str = ""
     BOT_WS_URL: str = ""
 
 
 class DBSetting(BaseSettings):
     # sql db
-    SQL_DATABASE_URI: str = ""
+    SQL_DATABASE_URI: str = "mysql+pymysql://root:123456aB@127.0.0.1:3306/qq_bot"
 
     # vector db
     VECTOR_STORE_URL: str = ""
@@ -28,9 +29,9 @@ class DBSetting(BaseSettings):
     MINIO_ENDPOINT: str = ""
     MINIO_ACCESS_KEY: str = ""
     MINIO_SCCRET_KEY: str = ""
-    MINIO_JM_BOCKET_NAME: str = "jm-repertory"
-    MINIO_RANDOM_PIC_BOCKET_NAME: str = "random-pic"
-    MINIO_RANDOM_SETU_BOCKET_NAME: str = "random-st"
+    MINIO_JM_BOCKET_NAME: str = ""
+    MINIO_RANDOM_PIC_BOCKET_NAME: str = ""
+    MINIO_RANDOM_SETU_BOCKET_NAME: str = ""
 
 
 class LogSetting(BaseSettings):
@@ -55,7 +56,8 @@ class ServiceSetting(BaseSettings):
     EMBEDDING_MODEL: str = "bge-m3"
 
     # 注册的模型名（名称与LOCAL_PROMPT_ROOT下配置相对应）
-    CHATTER_LLM_CONFIG_NAME: str = "bot_chatter"
+    GROUP_CHATTER_LLM_CONFIG_NAME: str = "group_bot_chatter"
+    PRIVATE_CHATTER_LLM_CONFIG_NAME: str = "private_bot_chatter"
     TOOLS_LLM_CONFIG_NAME: str = "bot_toolbox"
     RELATION_EXTOR_LLM_CONFIG_NAME: str = "relation_extractor"
 
@@ -77,7 +79,7 @@ class ServiceSetting(BaseSettings):
     RANDOM_PIC_API_v1: str = "https://api.anosu.top/img"
     RANDOM_PIC_API_v2: str = "https://image.anosu.top/pixiv/json"
     NEWS_API: str = ""
-    NEWS_SOURCES: dict[str, str] = []  # 信源中文名与路由名的映射
+    NEWS_SOURCES: dict[str, str] = {}  # 信源中文名与路由名的映射
 
     # 指令配置
     COMMAND_CONFIG_FILE: str = "configs/other/command.yaml"

@@ -3,7 +3,7 @@ import functools
 import inspect
 from typing import Callable
 from ncatbot.core.message import BaseMessage, GroupMessage, PrivateMessage
-from qq_bot.conn.sql.session import LocalSession
+from qq_bot.conn.sql.session import LocalSessionSync,LocalSessionAsync
 
 from qq_bot.utils.logging import logger
 from qq_bot.utils.config import settings
@@ -174,7 +174,7 @@ def sql_session(func: Callable):
 
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
-            with LocalSession() as db:
+            with LocalSessionAsync() as db:
                 kwargs["db"] = db
                 return await func(*args, **kwargs)
 
@@ -183,7 +183,7 @@ def sql_session(func: Callable):
 
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
-            with LocalSession() as db:
+            with LocalSessionSync() as db:
                 return func(*args, db=db, **kwargs)
 
         return sync_wrapper

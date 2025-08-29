@@ -2,6 +2,7 @@ import json
 import random
 import re
 from typing import Literal
+from datetime import datetime, timezone
 from qq_bot.utils.logging import logger
 
 
@@ -95,3 +96,11 @@ def trans_int(data: int | str | None) -> int | None:
 
 def trans_str(data: int | str | None) -> str | None:
     return str(data) if data else None
+
+
+def time_trans_str(ts: int)->str:
+    return datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+
+def time_trans_int(dt_str: str)->int:
+    return int(datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S').replace().timestamp())
+

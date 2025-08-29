@@ -1,4 +1,4 @@
-# LQBot
+# QQBot
 
 None
 

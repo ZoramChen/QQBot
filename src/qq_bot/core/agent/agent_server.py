@@ -9,7 +9,7 @@ from qq_bot.conn.sql.crud.user_crud import (
 )
 from qq_bot.core.agent.base import AgentBase
 from qq_bot.utils.decorator import sql_session
-from qq_bot.utils.models import GroupMessageRecord, QUser
+from qq_bot.utils.models import GroupMessageRecord, PrivateMessageRecord, QUser
 from qq_bot.utils.util_text import (
     auto_split_sentence,
     language_classifity,
@@ -19,25 +19,49 @@ from qq_bot.conn.sql.crud.group_message_crud import (
     insert_group_message,
     insert_group_messages,
 )
+from qq_bot.conn.sql.crud.private_message_crud import (
+    insert_private_message,
+    insert_private_messages,
+)
 
 from qq_bot.core import llm_registrar
 from qq_bot.utils.config import settings
 from qq_bot.utils.logging import logger
-from qq_bot.core.llm_manager.llms.chatter import LLMChatter
 
 
 @sql_session
-def save_msg_2_sql(
+def save_group_msg_2_sql(
     messages: list[GroupMessageRecord] | GroupMessageRecord,
+    reply_messages: list[str] | str,
     db: Session | None = None,
 ) -> None:
     try:
         abs: str = ""
         if isinstance(messages, list):
-            insert_group_messages(db=db, messages=messages)
+            insert_group_messages(db=db, messages=messages,reply_messages=reply_messages)
             abs = ", ".join([f"{i.content[:4]}.." for i in messages])
         elif isinstance(messages, GroupMessageRecord):
-            insert_group_message(db=db, message=messages)
+            insert_group_message(db=db, message=messages,reply_message=reply_messages)
+            abs = f"{messages.content[:5]}.."
+        else:
+            return
+        logger.info(f"聊天记录已存储: {abs}")
+    except Exception as err:
+        logger.error(f"{err}. 聊天记录存储失败: {abs}")
+
+@sql_session
+def save_private_msg_2_sql(
+        messages: list[PrivateMessageRecord] | PrivateMessageRecord,
+        reply_messages: list[str] | str,
+        db: Session | None = None,
+) -> None:
+    try:
+        abs: str = ""
+        if isinstance(messages, list):
+            insert_private_messages(db=db, messages=messages,reply_messages=reply_messages)
+            abs = ", ".join([f"{i.content[:4]}.." for i in messages])
+        elif isinstance(messages, PrivateMessageRecord):
+            insert_private_message(db=db, message=messages,reply_message=reply_messages)
             abs = f"{messages.content[:5]}.."
         else:
             return
@@ -105,7 +129,7 @@ async def group_random_chat(
     if real_prob < prob:
         logger.info(f"回复意愿达标 [{prob:.2f}({real_prob:.2f}) / 1.0]")
 
-        llm: LLMChatter = llm_registrar.get(settings.CHATTER_LLM_CONFIG_NAME)
+        llm: LLMGroupChatter = llm_registrar.get(settings.GROUP_CHATTER_LLM_CONFIG_NAME)
         bot_reply: str | None = await llm.run(message)
 
         if not bot_reply:
@@ -122,12 +146,12 @@ async def group_random_chat(
                 bot_reply = await send_msg_2_group(api, message.group_id, part, reply=message.id)
                 if bot_reply:
                     bot_messages.append(bot_reply)
-            save_msg_2_sql(messages=bot_messages)
+            save_group_msg_2_sql(messages=bot_messages)
         else:
             await asyncio.sleep(typing_time_calculate(bot_reply, language))
             bot_message = await send_msg_2_group(api, message.group_id, bot_reply, reply=message.id)
             if bot_message is not None:
-                save_msg_2_sql(messages=bot_message)
+                save_group_msg_2_sql(messages=bot_message)
 
         return True
 
