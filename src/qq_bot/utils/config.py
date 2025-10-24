@@ -100,6 +100,9 @@ class ServiceSetting(BaseSettings):
         "group_at_chat": [],
     }
 
+    MCP_CONFIG_PATH: str ="./mcp_config.json"
+    MCP_ACTIVATE: bool = False
+
 
 class Setting(SysSetting, DBSetting, LogSetting, ServiceSetting):
     class Config:

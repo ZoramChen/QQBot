@@ -1,7 +1,10 @@
 from ncatbot.core import GroupMessage, PrivateMessage, MessageChain, Face
 import hashlib
 from ncatbot.plugin import CompatibleEnrollment
+from qq_bot.core.llm_manager.llm_registrar import get_llm_registrar
+
 from qq_bot.core.tool_manager.tool_registrar import ToolRegistrar
+from qq_bot.core.mcp_manager.mcp_register import get_mcp_register
 from qq_bot.core.agent.agent_command import (
     group_at_chat,
     group_at_reply,
@@ -10,7 +13,7 @@ from qq_bot.core.agent.agent_command import (
     group_use_tool,
 )
 from qq_bot.core.agent.agent_server import save_group_msg_2_sql,save_private_msg_2_sql
-from qq_bot.core import llm_registrar
+# from qq_bot.core import llm_registrar
 from qq_bot.utils.models import GroupMessageRecord,PrivateMessageRecord
 from qq_bot.utils.logging import logger
 from qq_bot.utils.config import settings
@@ -22,7 +25,7 @@ class QQBot(BasePlugin):
     name = "QQBot"  # 插件名称
     version = "0.1.1"  # 插件版本
 
-    def init(self, **kwargs) -> None:
+    async def init(self, **kwargs) -> None:
         logger.info(f"加载插件")
         self.tools = ToolRegistrar(agent=self)
 
@@ -34,9 +37,11 @@ class QQBot(BasePlugin):
             group_at_reply,
             group_at_chat,
         ]
+        self.tools_description = [self.tools.tools["reminder_schedule"].description]
+        self.llm_registrar = await get_llm_registrar()
 
     async def on_load(self):
-        self.init()
+        await self.init()
         print(f"{self.name} 插件已加载")
         print(f"插件版本: {self.version}")
         self.register_handlers()
@@ -58,7 +63,7 @@ class QQBot(BasePlugin):
                 logger.warning(f"非文本消息，跳过")
                 return
             user_msg = await GroupMessageRecord.from_group_message(msg, False)
-            cur_model = llm_registrar.get(
+            cur_model = self.llm_registrar.get(
                 settings.GROUP_CHATTER_LLM_CONFIG_NAME
             )
             tools=[self.tools.tools["reminder_schedule"].description]
@@ -88,14 +93,13 @@ class QQBot(BasePlugin):
                 logger.warning(f"非文本消息，跳过")
                 return
             user_msg = await PrivateMessageRecord.from_private_message(msg, False)
-            cur_model = llm_registrar.get(
+            cur_model = self.llm_registrar.get(
                 settings.PRIVATE_CHATTER_LLM_CONFIG_NAME
             )
             await cur_model.update_users_info(user_msg.user_id,self.api)
-            tools=[self.tools.tools["reminder_schedule"].description]
             if user_msg.content != "":
                 # 获取大模型回答
-                res = await cur_model.run(user_msg,tools=tools)
+                res = await cur_model.run(user_msg)
                 # 如果是文本类回答
                 if isinstance(res, str):
                     format_message = cur_model.standardize_llm_messages(res)

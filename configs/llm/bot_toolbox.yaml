@@ -1,6 +1,6 @@
 activate: true
 default_reply: ''
-model: gpt-4o-mini-ca
+model:
 version: prompt_v1
 system_prompt:
   prompt_v1: |

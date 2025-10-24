@@ -24,7 +24,7 @@ from qq_bot.conn.sql.crud.private_message_crud import (
     insert_private_messages,
 )
 
-from qq_bot.core import llm_registrar
+from qq_bot.core import get_llm_registrar
 from qq_bot.utils.config import settings
 from qq_bot.utils.logging import logger
 
@@ -128,7 +128,7 @@ async def group_random_chat(
     real_prob = random.random()
     if real_prob < prob:
         logger.info(f"回复意愿达标 [{prob:.2f}({real_prob:.2f}) / 1.0]")
-
+        llm_registrar = get_llm_registrar()
         llm: LLMGroupChatter = llm_registrar.get(settings.GROUP_CHATTER_LLM_CONFIG_NAME)
         bot_reply: str | None = await llm.run(message)
 

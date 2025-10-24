@@ -220,22 +220,25 @@ class LLMPrivateChatter(OpenAIBase):
                 name=str(message.user_id)[:6],
             )
         )
-        llm_message = await self._async_inference(content=history, custom_system_prompt=self.user_system_prompt.get(user_id,None), **kwargs)
-
+        if settings.MCP_ACTIVATE:
+            llm_message = await self._async_tool_inference(content=history, custom_system_prompt=self.user_system_prompt.get(user_id,None), **kwargs)
+            print(llm_message)
+        else:
+            llm_message = await self._async_inference(content=history, custom_system_prompt=self.user_system_prompt.get(user_id,None), **kwargs)
+        # if llm_message and llm_message.tool_calls:
+        #     tool_call = llm_message.tool_calls[0]
+        #     # 获取函数调用的参数
+        #     args = json.loads(tool_call.function.arguments)
+        #     content = llm_message.content
+        #     self.insert_and_update_history_message(message, content)
+        #     return {
+        #         "name":tool_call.function.name,
+        #         "args":args,
+        #         "content":content
+        #     }
         if llm_message and llm_message.content:
             self.insert_and_update_history_message(message, llm_message.content)
             return llm_message.content
-        elif llm_message and llm_message.tool_calls:
-            tool_call = llm_message.tool_calls[0]
-            # 获取函数调用的参数
-            args = json.loads(tool_call.function.arguments)
-            content = f"好嘞，我一定在{args['time']}提醒{args['user']}"
-            self.insert_and_update_history_message(message, content)
-            return {
-                "name":tool_call.function.name,
-                "args":args,
-                "content":content
-            }
         return None
 
 

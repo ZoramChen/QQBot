@@ -175,20 +175,18 @@ class LLMGroupChatter(OpenAIBase):
 
         llm_message = await self._async_inference(content=history, **kwargs)
 
-        if llm_message and llm_message.content:
-            self.insert_and_update_history_message(message, llm_message.content)
-            return llm_message.content
-        elif llm_message and llm_message.tool_calls:
+        if llm_message and llm_message.tool_calls:
             tool_call = llm_message.tool_calls[0]
             # 获取函数调用的参数
             args = json.loads(tool_call.function.arguments)
-            content = f"好嘞，我一定在{args['time']}提醒{args['user']}"
+            content = llm_message.content or f"好嘞，我一定在{args['time']}提醒{args['user']}"
             self.insert_and_update_history_message(message, content)
             return {
                 "name":tool_call.function.name,
                 "args":args,
                 "content":content
             }
-
-
+        elif llm_message and llm_message.content:
+            self.insert_and_update_history_message(message, llm_message.content)
+            return llm_message.content
         return None

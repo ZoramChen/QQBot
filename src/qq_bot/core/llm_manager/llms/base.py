@@ -1,4 +1,5 @@
 import os
+import json
 import re
 from functools import partial
 from typing import Any, Optional, Union
@@ -11,7 +12,9 @@ from openai.types.chat import (
 )
 from qq_bot.utils.util import load_yaml
 from qq_bot.utils.decorator import function_retry
+from qq_bot.core.mcp_manager.mcp_register import get_mcp_register
 
+from qq_bot.utils.config import settings
 
 class OpenAIBase:
     __model_tag__ = "openai"
@@ -46,6 +49,9 @@ class OpenAIBase:
             timeout=20,
             **kwargs,
         )
+
+    async def init(self):
+        self.mcp_tools = await get_mcp_register() if settings.MCP_ACTIVATE else None
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -145,6 +151,7 @@ class OpenAIBase:
             completion = await self.async_client.chat.completions.create(
                 messages=messages, model=model, **kwargs
             )
+            print(completion)
             if completion.choices and completion.choices[-1].message:
                 raw = completion.choices[-1].message.content or ""
                 cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
@@ -154,6 +161,127 @@ class OpenAIBase:
             return None
         else:
             return self.default_reply
+
+
+
+
+
+    @function_retry
+    async def _async_tool_inference(
+            self, content: Any, model: Optional[str] = None, **kwargs
+    ) -> ChatCompletionMessage | None:
+        if self.is_activate:
+            assert isinstance(content, str) or isinstance(
+                content, list
+            ), f"Illegal LLM input type: {type(content)}"
+
+            model = model or self.default_model
+            if isinstance(content, str):
+                messages = [
+                    self.base_system_prompt,
+                    self.format_user_message(content=content),
+                ]
+            if isinstance(content, list):
+                content.insert(0, self.base_system_prompt)
+                messages = content
+            if "custom_system_prompt" in kwargs:
+                if kwargs["custom_system_prompt"]:
+                    messages.insert(1, kwargs["custom_system_prompt"])
+                kwargs.pop("custom_system_prompt")
+
+            iterations = 0
+            max_iterations=5
+            while iterations < max_iterations:  # 防止无限循环
+                iterations += 1
+                print(f"第{iterations}次询问",messages)
+                completion = await self.async_client.chat.completions.create(
+                    messages=messages, model=model, tools=self.mcp_tools.tools_description, **kwargs
+                )
+                print(completion)
+                if completion.choices and completion.choices[-1].message:
+                    raw = completion.choices[-1].message.content or ""
+                    cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+                    completion.choices[-1].message.content = cleaned
+                    llm_message = completion.choices[-1].message
+
+                    if llm_message and llm_message.tool_calls:
+                        messages.append({
+                            "role": "assistant",
+                            "content": llm_message.content or "",
+                            "tool_calls": [
+                                {
+                                    "id": tc.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc.function.name,
+                                        "arguments": tc.function.arguments
+                                    }
+                                } for tc in llm_message.tool_calls
+                            ]
+                        })
+
+
+                        for tool_call in llm_message.tool_calls:
+                            tool_name = tool_call.function.name
+                            args = json.loads(tool_call.function.arguments)
+                            if tool_name in self.mcp_tools.tools:
+                                res = await self.mcp_tools.execute_tool(tool_name,args)
+                                print("工具调用",res)
+                                messages.append({"content":str(res),"role":"tool","tool_call_id": tool_call.id})
+                    else:
+                        return completion.choices[-1].message
+                else:
+                    return self.default_reply
+            return self.default_reply
+
+
+
+
+
+
+
+
+        #     first_completion = await self.async_client.chat.completions.create(
+        #         messages=messages, model=model, tools=self.mcp_tools.tools_description,**kwargs
+        #     )
+        #     print("第一次对话",first_completion)
+        #     if first_completion.choices and first_completion.choices[-1].message:
+        #         raw = first_completion.choices[-1].message.content or ""
+        #         cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+        #         first_completion.choices[-1].message.content = cleaned
+        #         llm_message = first_completion.choices[-1].message
+        #
+        #         if llm_message and llm_message.tool_calls:
+        #             tool_call = llm_message.tool_calls[0]
+        #             tool_name = tool_call.function.name
+        #             args = json.loads(tool_call.function.arguments)
+        #             if tool_name in self.mcp_tools.tools:
+        #                 res = await self.mcp_tools.execute_tool(tool_name,args)
+        #                 print("工具调用",res)
+        #
+        #                 messages.insert(-1, {"content":res,"role":"assistant"})
+        #         else:
+        #             return first_completion.choices[-1].message
+        #     print(type(messages),messages)
+        #     second_completion = await self.async_client.chat.completions.create(
+        #         messages=messages, model=model, tools=self.mcp_tools.tools_description, **kwargs
+        #     )
+        #     print("第二次对话",second_completion)
+        #     if second_completion.choices and second_completion.choices[-1].message:
+        #         raw = second_completion.choices[-1].message.content or ""
+        #         cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+        #         second_completion.choices[-1].message.content = cleaned
+        #         return second_completion.choices[-1].message
+        #     return None
+        # else:
+        #     return self.default_reply
+
+
+    # @function_retry
+    # async def _async_execute_tool(
+    #         self, function_name: str, **kwargs
+    # ) -> str| None:
+
 
     async def run(self, message: Any, **kwargs) -> Any:
         pass

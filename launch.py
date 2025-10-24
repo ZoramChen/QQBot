@@ -42,5 +42,5 @@ config.set_bot_uin(f"{settings.BOT_UID}")
 config.set_root(f"{settings.ROOT}")
 
 if __name__ == "__main__":
-    BotClient().run()
+    BotClient().run(enable_webui_interaction=False)
 
