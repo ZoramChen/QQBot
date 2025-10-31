@@ -1,5 +1,7 @@
 import asyncio
+import hashlib
 from ncatbot.core import BotAPI
+from ncatbot.plugin import BasePlugin
 from sqlmodel import Session
 from qq_bot.core.agent.agent_server import send_msg_2_group
 from qq_bot.core.agent.base import AgentBase
@@ -40,6 +42,17 @@ class ReminderScheduleTool(ToolBase):
         },
         "is_meta": False,
     }
+
+    @staticmethod
+    def function(bot: BasePlugin, **kwargs) -> bool:
+        bot.add_scheduled_task(
+            job_func=ReminderScheduleTool.private_msg_function,
+            name=hashlib.md5(str(kwargs).encode("utf-8")).hexdigest(),
+            interval=kwargs["time"],
+            kwargs={"user_id":kwargs["user_id"],"content":f"{kwargs['user']},{kwargs['message']}","api":bot.api},
+        )
+        return True
+
 
     # @staticmethod
     # def function(

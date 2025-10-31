@@ -8,12 +8,13 @@ class SysSetting(BaseSettings):
     # Bot基本设置
     BOT_UID: str = ""
     ROOT: str = ""
-    BOT_WS_URL: str = ""
+    WS_URL: str = ""
+    WS_TOKEN: str = ""
 
 
 class DBSetting(BaseSettings):
     # sql db
-    SQL_DATABASE_URI: str = "mysql+pymysql://root:123456aB@127.0.0.1:3306/qq_bot"
+    SQL_DATABASE_URI: str = ""
 
     # vector db
     VECTOR_STORE_URL: str = ""

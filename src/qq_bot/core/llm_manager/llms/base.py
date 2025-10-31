@@ -10,6 +10,9 @@ from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionMessage,
 )
+from ncatbot.plugin import BasePlugin
+
+from qq_bot.core.tool_manager.tool_registrar import ToolRegistrar
 from qq_bot.utils.util import load_yaml
 from qq_bot.utils.decorator import function_retry
 from qq_bot.core.mcp_manager.mcp_register import get_mcp_register
@@ -25,6 +28,7 @@ class OpenAIBase:
         base_url: str,
         api_key: str,
         prompt_path: str,
+        bot: BasePlugin,
         max_retries: int = 3,
         retry: int = 3,
         **kwargs,
@@ -49,9 +53,12 @@ class OpenAIBase:
             timeout=20,
             **kwargs,
         )
+        self.bot = bot
 
     async def init(self):
         self.mcp_tools = await get_mcp_register() if settings.MCP_ACTIVATE else None
+        self.local_tools = ToolRegistrar(agent=self.bot)
+        self.tool_description = [*self.mcp_tools.tools_description, *self.local_tools.tool_dec]
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -168,7 +175,11 @@ class OpenAIBase:
 
     @function_retry
     async def _async_tool_inference(
-            self, content: Any, model: Optional[str] = None, **kwargs
+            self,
+            user_id: int,
+            content: Any,
+            model: Optional[str] = None,
+            **kwargs
     ) -> ChatCompletionMessage | None:
         if self.is_activate:
             assert isinstance(content, str) or isinstance(
@@ -193,11 +204,9 @@ class OpenAIBase:
             max_iterations=5
             while iterations < max_iterations:  # 防止无限循环
                 iterations += 1
-                print(f"第{iterations}次询问",messages)
                 completion = await self.async_client.chat.completions.create(
-                    messages=messages, model=model, tools=self.mcp_tools.tools_description, **kwargs
+                    messages=messages, model=model, tools=self.tool_description, **kwargs
                 )
-                print(completion)
                 if completion.choices and completion.choices[-1].message:
                     raw = completion.choices[-1].message.content or ""
                     cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
@@ -226,7 +235,9 @@ class OpenAIBase:
                             args = json.loads(tool_call.function.arguments)
                             if tool_name in self.mcp_tools.tools:
                                 res = await self.mcp_tools.execute_tool(tool_name,args)
-                                print("工具调用",res)
+                                messages.append({"content":str(res),"role":"tool","tool_call_id": tool_call.id})
+                            elif tool_name in self.local_tools.tools:
+                                res = await self.local_tools.run(tool_name,**{**args,"user_id":user_id})
                                 messages.append({"content":str(res),"role":"tool","tool_call_id": tool_call.id})
                     else:
                         return completion.choices[-1].message

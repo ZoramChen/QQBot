@@ -8,7 +8,7 @@ from typing import Any, Optional
 from itertools import chain
 from sqlmodel import Session
 from openai.types.chat import ChatCompletionSystemMessageParam
-
+from ncatbot.plugin import BasePlugin
 from qq_bot.conn.sql.crud.group_message_crud import fetch_all_group_messages
 from qq_bot.utils.decorator import sql_session
 from qq_bot.utils.models import GroupMessageRecord
@@ -28,6 +28,7 @@ class LLMGroupChatter(OpenAIBase):
         base_url: str,
         api_key: str,
         prompt_path: str,
+        bot: BasePlugin,
         max_retries: int = 3,
         retry: int = 3,
         **kwargs,
@@ -38,6 +39,7 @@ class LLMGroupChatter(OpenAIBase):
             prompt_path=prompt_path,
             max_retries=max_retries,
             retry=retry,
+            bot=bot,
             **kwargs,
         )
         self.cache_len = self.configs.get("message_cache_len", 5)

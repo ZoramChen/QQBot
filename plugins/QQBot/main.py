@@ -38,7 +38,7 @@ class QQBot(BasePlugin):
             group_at_chat,
         ]
         self.tools_description = [self.tools.tools["reminder_schedule"].description]
-        self.llm_registrar = await get_llm_registrar()
+        self.llm_registrar = await get_llm_registrar(self)
 
     async def on_load(self):
         await self.init()
@@ -46,7 +46,10 @@ class QQBot(BasePlugin):
         print(f"插件版本: {self.version}")
         self.register_handlers()
 
-
+    async def on_close(self):
+        print(f"[{self.name}] 开始执行自定义退出逻辑...")
+        mcp_tools = await get_mcp_register()
+        await mcp_tools.disconnect()
 
     def register_handlers(self):
         @bot.startup_event()
@@ -96,6 +99,7 @@ class QQBot(BasePlugin):
             cur_model = self.llm_registrar.get(
                 settings.PRIVATE_CHATTER_LLM_CONFIG_NAME
             )
+            logger.info(f"{user_msg.user_id}发来消息：{user_msg.content}")
             await cur_model.update_users_info(user_msg.user_id,self.api)
             if user_msg.content != "":
                 # 获取大模型回答
@@ -110,20 +114,8 @@ class QQBot(BasePlugin):
                         elif d["type"] == "image":
                             # await self.bot.api.post_private_msg(msg.user_id, image=d["content"])
                             await msg.reply(image=d["content"],is_file=True)
+                    logger.info(f"{user_msg.user_id}回复消息：{str(format_message)}")
                     save_private_msg_2_sql(messages=user_msg,reply_messages=res)
-                # 如果是function call
-                elif isinstance(res, dict):
-                    if res["name"] == "reminder_schedule":
-                        args = res["args"]
-                        await self.api.post_private_msg(user_id=user_msg.user_id,text=res["content"])
-
-                        self.add_scheduled_task(
-                            job_func=self.tools.tools["reminder_schedule"].private_msg_function,
-                            name=hashlib.md5(str(res["args"]).encode("utf-8")).hexdigest(),
-                            interval=args["time"],
-                            kwargs={"user_id":user_msg.user_id,"content":f"{args['user']},{args['message']}","api":self.api},
-                        )
-                        save_private_msg_2_sql(messages=user_msg,reply_messages=res["content"])
 
 
 

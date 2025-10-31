@@ -9,6 +9,7 @@ import asyncio
 from typing import Any, Optional
 from itertools import chain
 from ncatbot.core import BotAPI
+from ncatbot.plugin import BasePlugin
 from sqlmodel import Session
 from openai.types.chat import ChatCompletionSystemMessageParam
 from qq_bot.utils.decorator import sql_session
@@ -32,6 +33,7 @@ class LLMPrivateChatter(OpenAIBase):
         base_url: str,
         api_key: str,
         prompt_path: str,
+        bot: BasePlugin,
         max_retries: int = 3,
         retry: int = 3,
         **kwargs,
@@ -42,6 +44,7 @@ class LLMPrivateChatter(OpenAIBase):
             prompt_path=prompt_path,
             max_retries=max_retries,
             retry=retry,
+            bot=bot,
             **kwargs,
         )
         self.cache_len = self.configs.get("message_cache_len", 20)
@@ -221,8 +224,7 @@ class LLMPrivateChatter(OpenAIBase):
             )
         )
         if settings.MCP_ACTIVATE:
-            llm_message = await self._async_tool_inference(content=history, custom_system_prompt=self.user_system_prompt.get(user_id,None), **kwargs)
-            print(llm_message)
+            llm_message = await self._async_tool_inference(user_id=user_id,content=history, custom_system_prompt=self.user_system_prompt.get(user_id,None), **kwargs)
         else:
             llm_message = await self._async_inference(content=history, custom_system_prompt=self.user_system_prompt.get(user_id,None), **kwargs)
         # if llm_message and llm_message.tool_calls:
