@@ -34,6 +34,11 @@ class DBSetting(BaseSettings):
     MINIO_RANDOM_PIC_BOCKET_NAME: str = ""
     MINIO_RANDOM_SETU_BOCKET_NAME: str = ""
 
+    # chroma db
+    CHROMADB: str = "./chromadb"
+    CHROMADB_PRIVATE_MSG_COLLECTION: str = "private_msg_collection"
+    CHROMADB_GROUP_MSG_COLLECTION: str = "group_msg_collection"
+
 
 class LogSetting(BaseSettings):
     # logger

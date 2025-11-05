@@ -1,4 +1,4 @@
-from ncatbot.core import GroupMessage, PrivateMessage, MessageChain, Face
+from ncatbot.core import GroupMessage, PrivateMessage, MessageChain, Face, BaseMessage
 import hashlib
 from ncatbot.plugin import CompatibleEnrollment
 from qq_bot.core.llm_manager.llm_registrar import get_llm_registrar
@@ -45,6 +45,28 @@ class QQBot(BasePlugin):
         print(f"{self.name} 插件已加载")
         print(f"插件版本: {self.version}")
         self.register_handlers()
+
+        self.register_user_func(
+            name="ZoeHelp",
+            handler=self.zoe_help,
+            filter=lambda event: (
+                    isinstance(event, PrivateMessage) and
+                    event.raw_message.lower().startswith("/zoehelp")
+            ),
+            description="获取Zoe信息",
+            usage="/zoehelp",
+            examples=["/zoehelp", "/ZoeHelp", "/ZOEHELP"],
+            tags=["zoehelp"],
+        )
+
+    async def zoe_help(self, msg: BaseMessage):
+        reply = ("喵呜～主人敲敲Zoe的小脑袋，就能解锁4项专属技能喵✨\n"
+                 "1.🌦️全球天气秒查，晴雨都陪主人贴贴～\n"
+                 "2.🚄车票嗅嗅，余票时刻一手抓，出行不慌喵！\n"
+                 "3.⏰定时卖萌提醒，到点“喵——”叫醒主人，比心💗\n"
+                 "4.🌐联网小鱼干搜索，新鲜答案立刻叼回来～\n"
+                 "随时@Zoe，她摇尾巴秒出现，只对主人专喵🐾\n")
+        await msg.reply(text=reply)
 
     async def on_close(self):
         print(f"[{self.name}] 开始执行自定义退出逻辑...")
@@ -96,6 +118,8 @@ class QQBot(BasePlugin):
                 logger.warning(f"非文本消息，跳过")
                 return
             user_msg = await PrivateMessageRecord.from_private_message(msg, False)
+            if user_msg.content.lower().startswith("/zoehelp"):
+                return
             cur_model = self.llm_registrar.get(
                 settings.PRIVATE_CHATTER_LLM_CONFIG_NAME
             )

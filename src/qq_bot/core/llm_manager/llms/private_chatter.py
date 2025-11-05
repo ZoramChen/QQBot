@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
+import chromadb
 import re
 import time
 import json
@@ -12,6 +13,8 @@ from ncatbot.core import BotAPI
 from ncatbot.plugin import BasePlugin
 from sqlmodel import Session
 from openai.types.chat import ChatCompletionSystemMessageParam
+
+from qq_bot.conn.chroma.base import ChromaEmbeddingFunction, is_id_exists, message_add, messages_query
 from qq_bot.utils.decorator import sql_session
 from qq_bot.utils.models import PrivateMessageRecord, QUser
 from qq_bot.utils.util import search_meme
@@ -56,6 +59,29 @@ class LLMPrivateChatter(OpenAIBase):
         self.user_info: dict[int, QUser] = {}
         # 用户id 对应的用户个性化系统prompt
         self.user_system_prompt: dict[int, ChatCompletionSystemMessageParam] = {}
+        chroma_client = chromadb.PersistentClient(path="./chromadb")
+
+
+        try:
+            self.chroma_collection = chroma_client.get_collection(
+                name=settings.CHROMADB_PRIVATE_MSG_COLLECTION,
+                embedding_function=ChromaEmbeddingFunction(
+                    model_name=settings.EMBEDDING_MODEL,
+                    base_url=settings.EMBEDDING_BASE_URL,
+                    api_key=settings.EMBEDDING_API_KEY,
+                )
+            )
+        except Exception as e:
+            self.chroma_collection = chroma_client.create_collection(
+                name=settings.CHROMADB_PRIVATE_MSG_COLLECTION,
+                embedding_function=ChromaEmbeddingFunction(
+                    model_name=settings.EMBEDDING_MODEL,
+                    base_url=settings.EMBEDDING_BASE_URL,
+                    api_key=settings.EMBEDDING_API_KEY,
+                )
+            )
+
+
         self._load_mysql_data()
 
     @sql_session
@@ -113,7 +139,14 @@ class LLMPrivateChatter(OpenAIBase):
         if len(group_user_cache) >= self.cache_len:
             # 记忆长度超出，推出
             removed_msg = group_user_cache.pop(0)
-            self.llm_cache.pop(removed_msg.message_id, None)
+            pop_llm_message = self.llm_cache.pop(removed_msg.message_id, "")
+            if not is_id_exists(self.chroma_collection,str(removed_msg.message_id)):
+                message_add(
+                    collection=self.chroma_collection,
+                    document=f"{removed_msg.send_time}|{str(removed_msg.user_id)[:6]}|{removed_msg.content}\nassistant|{pop_llm_message}",
+                    id=str(removed_msg.message_id),
+                    metadata={"user_id": str(removed_msg.user_id)}
+                )
         group_user_cache.append(user_message)
 
         # 避免插入空值、避免重复插入
@@ -212,6 +245,11 @@ class LLMPrivateChatter(OpenAIBase):
         user_message = message.content
 
         history: list = self.get_history_message(user_id)
+
+        related_msgs = messages_query(self.chroma_collection,user_message,conditions={"user_id": str(user_id)})
+        history.append(
+            {"role": "system", "content": related_msgs}
+        )
         history.append(
             self.format_user_message(
                 content=self._set_prompt(
