@@ -75,6 +75,9 @@ class ServiceSetting(BaseSettings):
     BOT_COMMAND_GROUP_RANDOM_PIC: str = "来点二次元"
     BOT_COMMAND_GROUP_RANDOM_SETU: str = "来点涩图"
 
+    BOT_COMMAND_PRIVATE_DIARY: str = "#今日日记"
+    DIARY_PATH: str = "./"
+
     # 聊天意愿
     CHAT_WILLINGNESS: float = 0.05
 

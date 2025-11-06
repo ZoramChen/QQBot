@@ -10,7 +10,7 @@ from qq_bot.core.agent.agent_command import (
     group_at_reply,
     group_random_picture,
     group_random_setu,
-    group_use_tool,
+    group_use_tool, private_diary_record,
 )
 from qq_bot.core.agent.agent_server import save_group_msg_2_sql,save_private_msg_2_sql
 # from qq_bot.core import llm_registrar
@@ -37,6 +37,9 @@ class QQBot(BasePlugin):
             group_at_reply,
             group_at_chat,
         ]
+        self.private_command = [
+            private_diary_record
+        ]
         self.tools_description = [self.tools.tools["reminder_schedule"].description]
         self.llm_registrar = await get_llm_registrar(self)
 
@@ -60,11 +63,12 @@ class QQBot(BasePlugin):
         )
 
     async def zoe_help(self, msg: BaseMessage):
-        reply = ("喵呜～主人敲敲Zoe的小脑袋，就能解锁4项专属技能喵✨\n"
+        reply = ("喵呜～主人敲敲Zoe的小脑袋，就能解锁5项专属技能喵✨\n"
                  "1.🌦️全球天气秒查，晴雨都陪主人贴贴～\n"
                  "2.🚄车票嗅嗅，余票时刻一手抓，出行不慌喵！\n"
                  "3.⏰定时卖萌提醒，到点“喵——”叫醒主人，比心💗\n"
                  "4.🌐联网小鱼干搜索，新鲜答案立刻叼回来～\n"
+                 "5.📝日记悄悄记，主人的开心烦恼都藏好，下次还能翻出来喵～\n"
                  "随时@Zoe，她摇尾巴秒出现，只对主人专喵🐾\n")
         await msg.reply(text=reply)
 
@@ -120,6 +124,10 @@ class QQBot(BasePlugin):
             user_msg = await PrivateMessageRecord.from_private_message(msg, False)
             if user_msg.content.lower().startswith("/zoehelp"):
                 return
+
+            for handler in self.private_command:
+                if await handler(agent=self, message=user_msg, origin_msg=msg):
+                    return
             cur_model = self.llm_registrar.get(
                 settings.PRIVATE_CHATTER_LLM_CONFIG_NAME
             )

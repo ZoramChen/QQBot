@@ -2,10 +2,12 @@ import os
 from datetime import datetime
 from ncatbot.core import BotAPI, BotClient, GroupMessage, PrivateMessage
 from PIL import Image
+from datetime import datetime
+from ncatbot.plugin import BasePlugin
 
 from qq_bot.core.agent.base import AgentBase
 from qq_bot.utils.decorator import MessageCommands
-from qq_bot.utils.models import GroupMessageRecord
+from qq_bot.utils.models import GroupMessageRecord, PrivateMessageRecord
 from qq_bot.utils.util import blue_image
 from qq_bot.core.agent.agent_server import group_random_chat
 from qq_bot.core import random_pic_provider
@@ -106,3 +108,27 @@ async def group_at_chat(agent: AgentBase, message: GroupMessageRecord, **kwargs)
     )
     if status:
         logger.info(f"[{message.id}] 随机聊天触发")
+
+
+
+
+@MessageCommands(command=f"{settings.BOT_COMMAND_PRIVATE_DIARY}")
+async def private_diary_record(agent: BasePlugin, message: PrivateMessageRecord, **kwargs) -> bool:
+    try:
+        now = datetime.now()
+        date_str = now.strftime("%Y-%m-%d")
+        month_str = now.strftime("%Y-%m")
+        diary_dir = os.path.join(settings.DIARY_PATH, "diary_record", str(message.user_id), month_str)
+        if diary_dir and not os.path.exists(diary_dir):
+            os.makedirs(diary_dir)
+        diary_path = os.path.join(diary_dir, f"diary_{date_str}.txt")
+
+        cleaned_text = message.content.replace("#今日日记", "", 1)
+
+        with open(diary_path, 'w', encoding='utf-8') as file:
+            file.write(cleaned_text.strip())
+            await agent.api.post_private_msg(user_id=message.user_id,text="日记保存成功")
+        return True
+    except:
+        await agent.api.post_private_msg(user_id=message.user_id,text="日记保存失败")
+        return False
