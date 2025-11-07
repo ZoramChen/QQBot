@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 from ncatbot.core import BotAPI, BotClient, GroupMessage, PrivateMessage
 from PIL import Image
@@ -116,18 +117,44 @@ async def group_at_chat(agent: AgentBase, message: GroupMessageRecord, **kwargs)
 async def private_diary_record(agent: BasePlugin, message: PrivateMessageRecord, **kwargs) -> bool:
     try:
         now = datetime.now()
-        date_str = now.strftime("%Y-%m-%d")
+        date_str = now.strftime("%Y-%m-%d_%H-%M")
         month_str = now.strftime("%Y-%m")
         diary_dir = os.path.join(settings.DIARY_PATH, "diary_record", str(message.user_id), month_str)
         if diary_dir and not os.path.exists(diary_dir):
             os.makedirs(diary_dir)
         diary_path = os.path.join(diary_dir, f"diary_{date_str}.txt")
 
-        cleaned_text = message.content.replace("#今日日记", "", 1)
+
+        weekday_map = {
+            0: "星期一",
+            1: "星期二",
+            2: "星期三",
+            3: "星期四",
+            4: "星期五",
+            5: "星期六",
+            6: "星期日"
+        }
+        chinese_weekday = weekday_map[now.weekday()]
+        def add_two_spaces_after_newline(text):
+            return re.sub(r'\n\s*', '\n　　', text)
+
+        user_info = await agent.api.get_stranger_info(user_id=message.user_id)
+        nickname = user_info["data"]["nick"]
+
+
+        cleaned_diary = message.content.replace("#今日日记", "", 1)
+        diary_content = (
+                now.strftime("%Y年%m月%d日|")
+                + chinese_weekday
+                + "　　"
+                + add_two_spaces_after_newline(cleaned_diary)
+                + f"\n\n{nickname} 于{now.strftime('%H:%M')}所写"
+        )
+
 
         with open(diary_path, 'w', encoding='utf-8') as file:
-            file.write(cleaned_text.strip())
-            await agent.api.post_private_msg(user_id=message.user_id,text="日记保存成功")
+            file.write(diary_content.strip())
+            await agent.api.post_private_msg(user_id=message.user_id,text=f"日记保存成功，你一共写了{len(message.content)}字")
         return True
     except:
         await agent.api.post_private_msg(user_id=message.user_id,text="日记保存失败")
